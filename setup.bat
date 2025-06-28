@@ -1,5 +1,11 @@
 @echo off
 
+echo Actualizando pip...
 python -m pip install --upgrade pip
-python -m pip install -r requirements.txt
-python -m pip install -e .
+
+echo Instalando el proyecto y sus dependencias...
+rem Este comando ahora lee el '-e .' en requirements.txt y ejecuta setup.py
+pip install -r requirements.txt
+
+echo ¡Configuracion completada en Windows!
+pause
