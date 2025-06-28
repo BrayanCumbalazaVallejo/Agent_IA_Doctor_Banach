@@ -1,0 +1,9 @@
+ipykernel
+matplotlib
+pandas
+pytest
+scikit-learn
+seaborn
+statsmodels
+nbimporter
+nbformat
