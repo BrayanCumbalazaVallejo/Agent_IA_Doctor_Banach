@@ -1,33 +1,41 @@
-# HACKATON_DEEPPUNK_SENTINEL_AIR
+# Doctor Banach HACKATON DEEPPUNK
 
-Descripción del proyecto aquí.
+# Integrantes
+Brayan Cumbalaza
 
-## Configuración de Entorno
+Santiago Salcedo
 
-### MacOS y Linux
+Jerónimo Hoyos Botero
+# Configuración en Windows
 
-Ejecute los siguientes comandos en la terminal:
+Ejecute los siguientes comandos en el terminal:
 
-```bash
-python3 -m venv .venv
-source .venv/bin/activate
-source setup.sh
+```
+python -m venv venv
+venv\Scripts\activate
+python.exe -m pip install --upgrade pip
+pip install -r requirements.txt
+```
+# Configuración en MacOS y Linux
+
+Ejecute los siguientes comandos en el terminal:
+
+```
+python3 -m venv venv
+source venv/bin/activate
+pip install --upgrade pip
+pip install -r requirements.txt
+```
+# Configuración correo origen archivo .env
+Crear el archivo .env con esta información rellenada:
+
+```
+EMAIL_APPLICATION=''
+PASSWORD_APPLICATION=''
 ```
 
-### Windows
+# Para desactivar entorno
 
-Ejecute los siguientes comandos en la terminal:
-
-```CMD
-python -m venv .venv
-.venv\Scripts\activate
-setup.bat
 ```
-
-## Ejecución de Pruebas
-
-Para verificar que la instalación fue correcta, ejecute el siguiente comando en la terminal:
-
-```bash
-pytest
+deactivate
 ```
