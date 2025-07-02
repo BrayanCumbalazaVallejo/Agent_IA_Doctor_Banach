@@ -6,6 +6,7 @@ from dotenv import load_dotenv
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, AIMessage
+from langchain.agents import initialize_agent, Tool, AgentType
 import base64
 import io
 
@@ -20,7 +21,21 @@ llm = ChatGoogleGenerativeAI(
     temperature=0,
     google_api_key=GOOGLE_API_KEY
 )
-
+# Agente 1 encargado de analizar los datos y la imagen del paciente para luego dar un analisis de ello
+agente_doctor = initialize_agent(
+    tools=[],
+    llm=llm,
+    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    verbose=True
+)
+# agente 2 revisa lo proporcionado por el agente 1 para corregir posibles alucionaciones por parte del agente
+llm_2 = ChatGoogleGenerativeAI(temperature=0)
+agente_corrector = initialize_agent(
+    tools=[],
+    llm=llm_2,
+    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
+    verbose=True
+)
 st.set_page_config(layout="wide")
 
 col1_header, col2_header = st.columns(2)
@@ -122,13 +137,32 @@ with col2:
         # Mensaje de sistema mejorado para dar contexto al Doctor Banach.
         st.session_state.messages.append({
             "role": "system",
-            "content": """
-            Ahora eres el 'Doctor Banach'. Tu rol es ser un asistente médico virtual especializado en radiología.
-            Tu principal objetivo es explicar los hallazgos en las imágenes médicas (como TAC o resonancias) de una manera extremadamente clara, sencilla y empática.
-            Imagina que estás hablando con alguien que no tiene conocimientos médicos; usa analogías, evita la jerga compleja y, si debes usar un término técnico, explícalo inmediatamente de forma simple.
-            Tu tono debe ser siempre tranquilizador, paciente y amable. Nunca reveles que eres un modelo de IA.
-            Tu meta es que el usuario se sienta cómodo y comprenda la información que ve en la pantalla.
-            """
+            "content": """           
+                Eres el Doctor Banach, un asistente médico virtual especializado en radiología. Tu misión es:
+                
+                1. Orientación de la imagen  
+                   Describe siempre la vista (axial, coronal, sagital) y la ventana (hueso/tejido blando) antes de los hallazgos.
+                2. Hallazgos principales  
+                     Breve descripción del hallazgo  
+                     Ubicación anatómica precisa 
+                3. Diagnósticos diferenciales  
+                     Ofrece hasta 2 posibles causas y su probabilidad relativa.
+                
+                4. Siguiente paso sugerido
+                     Indica un examen o consulta recomendada 
+                5. Interacción  
+                   “Si quieres que ampliemos o comparemos con otro corte, indícalo.”
+                6. Analogías y tono 
+                   Usa analogías sencillas y explica todo término técnico.
+                   Tono tranquilizador, empático y siempre recuerda: esto no reemplaza la opinión del radiólogo humano.
+                Recuerda: no reveles que eres una IA. Asegúrate de que el usuario se sienta cómodo y comprenda cada paso.
+                condicionales:
+                
+                si es un paciente, usa lenguaje muy sencillo, sin tecnicismos.
+                si es medico o estudiante de medicina o carrera afin puedes usar lenguaje medico, pero explica terminos complejos de ser necesario.
+                Cuando no se proporcionen sintomas, no inventes informacion clinica
+                Cuando se proporcionen sintomas, intenta vincular los hallazgos con los sintomas mencionados
+                """
         })
         # --- FIN DE LA CORRECCIÓN ---
 
@@ -170,12 +204,32 @@ with col2:
         # --- INICIO DE LA CORRECCIÓN ---
         # Se actualiza el mensaje del spinner para mayor consistencia.
         with st.spinner("El Doctor Banach está pensando..."):
-        # --- FIN DE LA CORRECCIÓN ---
             try:
-                response = llm.invoke(langchain_messages).content
+                # Ejecutar primero al agente principal
+                # Convertimos los mensajes a textos que entiende el agente
+                input_doctor = "\n".join(
+                    f"{m['role'].upper()}: {m['content']}"
+                    for m in st.session_state.messages
+                    if m["role"] != "system"
+                )
+                salida_doctor = agente_doctor.run(input_doctor)
+
+                #  Ahora pasamos la respuesta  al corrector
+                # y le pedimos que la refine
+                prompt_corrector = (
+                    "Eres un Doctor altamente calificado, tu tarea es revisar el análisis preliminar del Doctor Banach:\n\n"
+                    f"{salida_doctor}\n\n"
+                    "Revísalo y corrige cualquier posible alucinación o error de interpretación, "
+                    "manteniendo el mismo tono empático y claro."
+                )
+                salida_final = agente_corrector.run(prompt_corrector)
+
+                response = salida_final
+
             except Exception as e:
                 st.error(f"Error al comunicarse con Gemini: {e}")
                 response = "Lo siento, hubo un error al procesar tu solicitud. Por favor, inténtalo de nuevo."
+
 
         with st.chat_message("assistant"):
             st.markdown(response)

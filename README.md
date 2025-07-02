@@ -62,10 +62,10 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 # Configuración correo origen archivo .env
-Crear el archivo .env con esta información rellenada:
+Crear el archivo .env en la carpeta Hackaton_DeepPunk con esta información rellenada:
 
 ```
-APIKEY='SU_API_KEY_BRAYA/SANTIAGO'
+APIKEY='SU_API_KEY'
 ```
 # Creación carpeta con los datos dicom
 Crear una carpeta llamada data, donde estarán los dataset dicom
