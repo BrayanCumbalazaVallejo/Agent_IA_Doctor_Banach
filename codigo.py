@@ -8,15 +8,19 @@ import tempfile
 st.set_page_config(layout="wide")
 
 def cargar_pixeldata_dicom(carpeta_dicoms: str):
-    ordered_names = sorted(os.listdir(carpeta_dicoms))
     pixel_data = []
-    for name in ordered_names:
-        try:
-            dcm_path = os.path.join(carpeta_dicoms, name)
-            if os.path.isfile(dcm_path):
+    for root, _, files in os.walk(carpeta_dicoms):
+        sorted_files = sorted(files)
+        for name in sorted_files:
+            if not name.lower().endswith('.dcm'):
+                continue
+            try:
+                dcm_path = os.path.join(root, name)
                 pixel_data.append(pydicom.dcmread(dcm_path).pixel_array)
-        except pydicom.errors.InvalidDicomError:
-            continue
+            except (pydicom.errors.InvalidDicomError, AttributeError):
+                continue
+    if not pixel_data:
+        return np.array([])
     return np.array(pixel_data, dtype="int16")
 
 col_tomografia, col_chat = st.columns([0.6, 0.4], gap="large")
@@ -29,7 +33,7 @@ with col_tomografia:
         type=['zip']
     )
 
-    if uploaded_file is not None:
+    if uploaded_file:
         try:
             with tempfile.TemporaryDirectory() as temp_dir:
                 zip_path = os.path.join(temp_dir, uploaded_file.name)
@@ -41,7 +45,7 @@ with col_tomografia:
 
                 image_data = cargar_pixeldata_dicom(temp_dir)
 
-                if image_data.ndim == 3 and image_data.shape[0] > 1:
+                if image_data.size > 0 and image_data.ndim == 3:
                     num_slices = image_data.shape[0]
                     default_slice = num_slices // 2
 
@@ -66,7 +70,6 @@ with col_tomografia:
 
         except Exception as e:
             st.error(f"Error al procesar el archivo: {e}")
-
     else:
         placeholder_img = np.zeros((512, 512), dtype=np.uint8)
         st.image(
@@ -84,9 +87,7 @@ with col_tomografia:
 
 with col_chat:
     st.header("NeuroScan AI")
-
     report_container = st.container(height=450, border=True)
-
     report_container.markdown("""
     **Informe de Pre-análisis:**
 
@@ -94,16 +95,14 @@ with col_chat:
     - **Modalidad:** T2-weighted MRI
 
     **Hallazgos Descriptivos:**
-    1.  **Ventrículos Laterales:** Morfología y tamaño dentro de los límites de la normalidad para el grupo de edad de referencia. No se observa hidrocefalia.
-    2.  **Sustancia Gris-Blanca:** Diferenciación conservada. No se identifican lesiones focales evidentes, edema o áreas de restricción a la difusión en las secuencias evaluadas.
-    3.  **Fosa Posterior:** Cerebelo y tronco encefálico sin alteraciones significativas.
+    1.  **Ventrículos Laterales:** Morfología y tamaño dentro de los límites de la normalidad.
+    2.  **Sustancia Gris-Blanca:** Diferenciación conservada.
+    3.  **Fosa Posterior:** Cerebelo y tronco encefálico sin alteraciones.
 
     ---
 
-    *`Advertencia: Este es un análisis preliminar generado por una IA y no constituye un diagnóstico médico. La interpretación final debe ser realizada por un radiólogo certificado.`*
+    *`Advertencia: Este es un análisis preliminar generado por una IA y no constituye un diagnóstico médico.`*
     """)
-
     prompt = st.chat_input("Describe qué analizar en la imagen...")
-
     if prompt:
         report_container.info(f"Pregunta del usuario: {prompt}")
