@@ -1,5 +1,5 @@
 
-# Título bonito por hacer
+# Asistente-Radiologico-IA (hecho Por Jero)
 
 # 👥 Integrantes
 
