@@ -18,7 +18,7 @@ source setup.sh
 
 Ejecute los siguientes comandos en la terminal:
 
-```bash
+```CMD
 python -m venv .venv
 .venv\Scripts\activate
 setup.bat
