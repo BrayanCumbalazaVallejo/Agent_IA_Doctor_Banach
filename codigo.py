@@ -1,33 +1,50 @@
-import nibabel as nib
-import matplotlib.pyplot as plt
+import streamlit as st
 import numpy as np
 
-# Cargar el archivo NIfTI
-img = nib.load('sub-0202_ses-01_task-rest_bold.nii.gz')
+st.set_page_config(layout="wide")
 
-# Obtener los datos como un array de NumPy
-data = img.get_fdata()  # Dimensiones: (X, Y, Z, T)
+col_tomografia, col_chat = st.columns([0.6, 0.4], gap="large")
 
-print("Dimensiones del volumen:", data.shape)
+with col_tomografia:
+    st.header("Visor de Resonancia")
 
-# Escoger un tiempo (por ejemplo, el primer volumen temporal)
-t = 0
-vol = data[:, :, :, t]  # Volumen en t=0
+    placeholder_img = np.zeros((512, 512), dtype=np.uint8)
+    st.image(
+        placeholder_img,
+        caption="Sube un archivo .nii.gz para comenzar el análisis",
+        use_column_width=True
+    )
+    
+    slice_index = st.slider(
+        "Seleccionar corte (slice)",
+        min_value=0,
+        max_value=155, 
+        value=78,
+        help="Mueve el dial para navegar por los diferentes cortes de la imagen."
+    )
 
-# Visualizar el corte medio en los tres ejes
-fig, axes = plt.subplots(1, 3, figsize=(12, 4))
+with col_chat:
+    st.header("NeuroScan AI")
 
-# Eje sagital (X)
-axes[0].imshow(vol[vol.shape[0]//2, :, :].T, cmap='gray', origin='lower')
-axes[0].set_title('Sagital')
+    report_container = st.container(height=450, border=True)
+    
+    report_container.markdown("""
+    **Informe de Pre-análisis:**
+    
+    - **ID de Imagen:** sub-01_run-01_T2w
+    - **Modalidad:** T2-weighted MRI
+    
+    **Hallazgos Descriptivos:**
+    1.  **Ventrículos Laterales:** Morfología y tamaño dentro de los límites de la normalidad para el grupo de edad de referencia. No se observa hidrocefalia.
+    2.  **Sustancia Gris-Blanca:** Diferenciación conservada. No se identifican lesiones focales evidentes, edema o áreas de restricción a la difusión en las secuencias evaluadas.
+    3.  **Fosa Posterior:** Cerebelo y tronco encefálico sin alteraciones significativas.
+    
+    ---
+    
+    *`Advertencia: Este es un análisis preliminar generado por una IA y no constituye un diagnóstico médico. La interpretación final debe ser realizada por un radiólogo certificado.`*
+    """)
 
-# Eje coronal (Y)
-axes[1].imshow(vol[:, vol.shape[1]//2, :].T, cmap='gray', origin='lower')
-axes[1].set_title('Coronal')
+    prompt = st.chat_input("Describe qué analizar en la imagen...")
 
-# Eje axial (Z)
-axes[2].imshow(vol[:, :, vol.shape[2]//2].T, cmap='gray', origin='lower')
-axes[2].set_title('Axial')
-
-plt.tight_layout()
-plt.show()
+    if prompt:
+        report_container.info(f"Pregunta del usuario: {prompt}")
