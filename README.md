@@ -1,11 +1,11 @@
 
-# Asistente-Radiologico-IA
+# Asistente-Radiologico-IA (hecho Por Jero)
 
 # 👥 Integrantes
 
-Brayan Cumbalaza Valejo
+Brayan Cumbalaza
 
-Santiago Abelardo Salcedo Rodriguez
+Santiago Salcedo
 
 Jerónimo Hoyos Botero
 
