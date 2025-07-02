@@ -1,26 +1,41 @@
+#Herramientas
 import numpy as np
-import matplotlib.pyplot as plt
-import streamlit as st
 import time
-from dotenv import load_dotenv
 import os
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_core.messages import HumanMessage, AIMessage
 from langchain.agents import initialize_agent, Tool, AgentType
 import base64
+from dotenv import load_dotenv
+import pydicom
 import io
+#Visualización y parte gráfica
+import matplotlib.pyplot as plt
+import streamlit as st
+#Manejo modelos de lenguaje
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_core.messages import HumanMessage, AIMessage
 
-from my_functions import *
+def cargar_pixeldata_dicom(carpeta_dicoms: str):
+    """
+    Genera un np array valores de gris de 3 dimensiones de la forma (axial,sagital,coronal) a partir de un directorio de dicoms
+    """
+    ordered_names = sorted(os.listdir(carpeta_dicoms))
+    pixel_data = [pydicom.dcmread(os.path.join(carpeta_dicoms, name)).pixel_array for name in ordered_names]
+    return np.array(pixel_data,dtype="int16")
 
+#Subir el API KEY para conectar con el modelo y dirección DICOM
 load_dotenv()
-
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-
+DICOM_FOLDER_PATH = os.getenv('DICOM_FOLDER_PATH')
+#LLM
 llm = ChatGoogleGenerativeAI(
     model="gemini-1.5-flash",
     temperature=0,
     google_api_key=GOOGLE_API_KEY
 )
+
+
 # Agente 1 encargado de analizar los datos y la imagen del paciente para luego dar un analisis de ello
 agente_doctor = initialize_agent(
     tools=[],
@@ -35,8 +50,10 @@ agente_corrector = initialize_agent(
     llm=llm_2,
     agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
     verbose=True
-)
+)#Para poner ancha la página
 st.set_page_config(layout="wide")
+
+#Header decorado con la información del proyecto
 
 col1_header, col2_header = st.columns(2)
 
@@ -75,8 +92,10 @@ with col2_header:
 
 st.divider()
 
-col1, col2 = st.columns(2)
+#Cuerpo de la interfaz
 
+col1, col2 = st.columns(2)
+#Visualizador imagenes médicos
 with col1:
     st.markdown("""
     <div style="background-color: #1E1E1E; padding: 1.2rem 1.5rem; border-radius: 10px; border: 1px solid #333;
@@ -88,38 +107,38 @@ with col1:
     </div>
     """, unsafe_allow_html=True)
 
+    #Carga de datos
     @st.cache_data
     def cargar_datos():
-        return cargar_pixeldata_dicom("data/dataset_2_sub-01_run-01_T1w")
-
+        return cargar_pixeldata_dicom(DICOM_FOLDER_PATH)
     volumen = cargar_datos()
 
+    #Selección Corte anátomicos
     cortes_anatomicos = {
         "Axial": volumen,
         "Coronal": volumen.transpose(1, 0, 2),
         "Sagital": volumen.transpose(2, 0, 1)
     }
-
     corte = st.radio("Tipo Corte anátomico", ["Axial", "Coronal", "Sagital"], horizontal=True)
     vol = cortes_anatomicos[corte]
     index = st.slider(f"Corte {corte.lower()}", 0, vol.shape[0] - 1, 0)
-
+    #Rotación
     grados_rotacion = st.slider("Rotar imagen (grados)", min_value=0, max_value=270, step=90, value=0)
     k = grados_rotacion // 90
-
+    #Visualización en matplotlib
     fig, ax = plt.subplots(figsize=(6, 6))
     slice_mostrar = np.rot90(vol[index], k=k)
     ax.imshow(slice_mostrar, cmap="gray")
     ax.axis("off")
-
     st.pyplot(fig)
-
+    #Entrega de datos al modelo de lenguaje
     buf = io.BytesIO()
     fig.savefig(buf, format="png", bbox_inches='tight', pad_inches=0)
     buf.seek(0)
     st.session_state.current_dicom_image_base64 = base64.b64encode(buf.read()).decode("utf-8")
     plt.close(fig)
 
+#Chat con el modelo de lenguaje
 with col2:
     st.markdown("""
     <div style="background-color: #1E1E1E; padding: 1.2rem 1.5rem; border-radius: 10px; border: 1px solid #333;
@@ -133,8 +152,7 @@ with col2:
 
     if "messages" not in st.session_state:
         st.session_state.messages = []
-        # --- INICIO DE LA CORRECCIÓN ---
-        # Mensaje de sistema mejorado para dar contexto al Doctor Banach.
+        #Contexto para darle al modelo sus indicaciones
         st.session_state.messages.append({
             "role": "system",
             "content": """           
@@ -164,7 +182,7 @@ with col2:
                 Cuando se proporcionen sintomas, intenta vincular los hallazgos con los sintomas mencionados
                 """
         })
-        # --- FIN DE LA CORRECCIÓN ---
+
 
     for msg in st.session_state.messages:
         if msg["role"] != "system":
@@ -183,6 +201,7 @@ with col2:
         user_message_content = [{"type": "text", "text": prompt}]
 
         if st.session_state.get("current_dicom_image_base64"):
+            #Entregarle la imagen al modelo de lenguaje
             user_message_content.append({
                 "type": "image_url",
                 "image_url": {
@@ -201,9 +220,8 @@ with col2:
             elif msg["role"] == "assistant":
                 langchain_messages.append(AIMessage(content=msg["content"]))
 
-        # --- INICIO DE LA CORRECCIÓN ---
-        # Se actualiza el mensaje del spinner para mayor consistencia.
         with st.spinner("El Doctor Banach está pensando..."):
+
             try:
                 # Ejecutar primero al agente principal
                 # Convertimos los mensajes a textos que entiende el agente
