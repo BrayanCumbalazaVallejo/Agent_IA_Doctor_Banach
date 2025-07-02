@@ -1,6 +1,5 @@
 import streamlit as st
 import numpy as np
-from images3 import images3
 
 st.set_page_config(layout="wide")
 
