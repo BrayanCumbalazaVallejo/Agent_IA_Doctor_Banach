@@ -1,70 +1,52 @@
-#Herramientas
+# Herramientas
 import numpy as np
 import time
 import os
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, AIMessage
-from langchain.agents import initialize_agent, Tool, AgentType
 import base64
-from dotenv import load_dotenv
-import pydicom
 import io
-#Visualización y parte gráfica
+import pydicom
+from dotenv import load_dotenv
+
+# Visualización y parte gráfica
 import matplotlib.pyplot as plt
 import streamlit as st
-#Manejo modelos de lenguaje
+
+# Manejo modelos de lenguaje
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage, AIMessage
+from langchain_core.messages import HumanMessage
 
+# --- FUNCIONES ---
 def cargar_pixeldata_dicom(carpeta_dicoms: str):
-    """
-    Genera un np array valores de gris de 3 dimensiones de la forma (axial,sagital,coronal) a partir de un directorio de dicoms
-    """
-    ordered_names = sorted(os.listdir(carpeta_dicoms))
-    pixel_data = [pydicom.dcmread(os.path.join(carpeta_dicoms, name)).pixel_array for name in ordered_names]
-    return np.array(pixel_data,dtype="int16")
+    try:
+        ordered_names = sorted(os.listdir(carpeta_dicoms))
+        pixel_data = [pydicom.dcmread(os.path.join(carpeta_dicoms, name)).pixel_array for name in ordered_names]
+        return np.array(pixel_data, dtype="int16")
+    except FileNotFoundError:
+        st.error(f"Error: No se encontró el directorio de DICOMs en la ruta: '{carpeta_dicoms}'.")
+        return None
+    except Exception as e:
+        st.error(f"Ocurrió un error al cargar los archivos DICOM: {e}")
+        return None
 
-#Subir el API KEY para conectar con el modelo y dirección DICOM
+# --- CONFIGURACIÓN INICIAL ---
 load_dotenv()
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-DICOM_FOLDER_PATH = os.getenv('DICOM_FOLDER_PATH')
-#LLM
-llm = ChatGoogleGenerativeAI(
-    model="gemini-1.5-flash",
-    temperature=0,
-    google_api_key=GOOGLE_API_KEY
-)
+DICOM_FOLDER_PATH = os.getenv('DICOM_FOLDER_PATH', './data/dataset_2_sub-01_run-01_T1w')
 
+# Modelos de Lenguaje
+llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0, google_api_key=GOOGLE_API_KEY)
+llm_2 = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.1, google_api_key=GOOGLE_API_KEY)
 
-# Agente 1 encargado de analizar los datos y la imagen del paciente para luego dar un analisis de ello
-agente_doctor = initialize_agent(
-    tools=[],
-    llm=llm,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=True
-)
-# agente 2 revisa lo proporcionado por el agente 1 para corregir posibles alucionaciones por parte del agente
-llm_2 = ChatGoogleGenerativeAI(temperature=0)
-agente_corrector = initialize_agent(
-    tools=[],
-    llm=llm_2,
-    agent=AgentType.ZERO_SHOT_REACT_DESCRIPTION,
-    verbose=True
-)#Para poner ancha la página
 st.set_page_config(layout="wide")
 
-#Header decorado con la información del proyecto
-
+# --- HEADER DE LA APLICACIÓN ---
 col1_header, col2_header = st.columns(2)
-
 with col1_header:
     st.markdown("""
     <div style="background-color: #1E1E1E; padding: 1.5rem; border-radius: 10px; border: 1px solid #333; height: 100%;">
         <div style='text-align: left; display: flex; flex-direction: column; justify-content: space-between; height: 100%;'>
             <div style='font-size: 50px;'>🩻 👨‍⚕️ 🧬 🩺</div>
-            <h1 style='color: #FF4B4B; margin-bottom: 0.2em;'>
-                <strong>Doctor</strong> <span style='color:#FFFFFF;'>Banach</span>
-            </h1>
+            <h1 style='color: #FF4B4B; margin-bottom: 0.2em;'><strong>Doctor</strong> <span style='color:#FFFFFF;'>Banach</span></h1>
             <h4 style='color: #CCCCCC; margin-top: 0;'>Tu asistente de estudios de imágenes médicas</h4>
         </div>
     </div>
@@ -74,13 +56,7 @@ with col2_header:
     st.markdown("""
     <div style="background-color: #1E1E1E; padding: 1.5rem; border-radius: 10px; border: 1px solid #333; height: 100%;">
         <h3 style="color: #FF4B4B; margin-bottom: 0.5rem;">📝 Descripción del proyecto</h3>
-        <p style="color: #CCCCCC; font-size: 16px;">
-            Esta herramienta interactiva permite visualizar <strong>cortes anatómicos</strong> (axial, coronal y sagital) 
-            a partir de estudios médicos (como TAC o resonancias), y proporciona asistencia para la interpretación inicial de las imágenes.
-        </p>
-        <p style="color: #CCCCCC; font-size: 16px;">
-            El objetivo es facilitar tanto el análisis técnico como el entendimiento por parte del paciente o especialista.
-        </p>
+        <p style="color: #CCCCCC; font-size: 16px;">Esta herramienta interactiva permite visualizar <strong>cortes anatómicos</strong> y proporciona asistencia para la interpretación inicial de las imágenes.</p>
         <ul style="color: #AAAAAA; font-size: 15px; line-height: 1.6;">
             <li>🔄 Visualización en tiempo real</li>
             <li>🔃 Rotación e inspección por cortes</li>
@@ -89,167 +65,160 @@ with col2_header:
     </div>
     """, unsafe_allow_html=True)
 
-
 st.divider()
 
-#Cuerpo de la interfaz
-
+# --- CUERPO DE LA INTERFAZ ---
 col1, col2 = st.columns(2)
-#Visualizador imagenes médicos
+
+# Columna 1: Visualizador de Imágenes
 with col1:
     st.markdown("""
-    <div style="background-color: #1E1E1E; padding: 1.2rem 1.5rem; border-radius: 10px; border: 1px solid #333;
-                 display: flex; align-items: center; gap: 0.8rem; min-height: 80px;">
+    <div style="background-color: #1E1E1E; padding: 1.2rem 1.5rem; border-radius: 10px; border: 1px solid #333; display: flex; align-items: center; gap: 0.8rem; min-height: 80px;">
         <div style='font-size: 30px;'>🧠</div>
-        <h2 style='color: #FFFFFF; margin: 0;'>
-            <span style='color:#FF4B4B;'>Visualizador</span> de cortes
-        </h2>
+        <h2 style='color: #FFFFFF; margin: 0;'><span style='color:#FF4B4B;'>Visualizador</span> de cortes</h2>
     </div>
     """, unsafe_allow_html=True)
 
-    #Carga de datos
     @st.cache_data
     def cargar_datos():
         return cargar_pixeldata_dicom(DICOM_FOLDER_PATH)
+    
     volumen = cargar_datos()
 
-    #Selección Corte anátomicos
-    cortes_anatomicos = {
-        "Axial": volumen,
-        "Coronal": volumen.transpose(1, 0, 2),
-        "Sagital": volumen.transpose(2, 0, 1)
-    }
-    corte = st.radio("Tipo Corte anátomico", ["Axial", "Coronal", "Sagital"], horizontal=True)
-    vol = cortes_anatomicos[corte]
-    index = st.slider(f"Corte {corte.lower()}", 0, vol.shape[0] - 1, 0)
-    #Rotación
-    grados_rotacion = st.slider("Rotar imagen (grados)", min_value=0, max_value=270, step=90, value=0)
-    k = grados_rotacion // 90
-    #Visualización en matplotlib
-    fig, ax = plt.subplots(figsize=(6, 6))
-    slice_mostrar = np.rot90(vol[index], k=k)
-    ax.imshow(slice_mostrar, cmap="gray")
-    ax.axis("off")
-    st.pyplot(fig)
-    #Entrega de datos al modelo de lenguaje
-    buf = io.BytesIO()
-    fig.savefig(buf, format="png", bbox_inches='tight', pad_inches=0)
-    buf.seek(0)
-    st.session_state.current_dicom_image_base64 = base64.b64encode(buf.read()).decode("utf-8")
-    plt.close(fig)
+    if volumen is not None:
+        cortes_anatomicos = {"Axial": volumen, "Coronal": volumen.transpose(1, 0, 2), "Sagital": volumen.transpose(2, 0, 1)}
+        corte = st.radio("Tipo Corte anatómico", ["Axial", "Coronal", "Sagital"], horizontal=True, key="corte_radio")
+        vol = cortes_anatomicos[corte]
+        index = st.slider(f"Corte {corte.lower()}", 0, vol.shape[0] - 1, vol.shape[0] // 2, key="corte_slider")
+        grados_rotacion = st.slider("Rotar imagen (grados)", 0, 270, 0, 90, key="rotacion_slider")
+        k = grados_rotacion // 90
+        
+        fig, ax = plt.subplots(figsize=(6, 6))
+        slice_mostrar = np.rot90(vol[index], k=k)
+        ax.imshow(slice_mostrar, cmap="gray")
+        ax.axis("off")
+        st.pyplot(fig)
+        
+        buf = io.BytesIO()
+        fig.savefig(buf, format="png", bbox_inches='tight', pad_inches=0)
+        buf.seek(0)
+        st.session_state.current_dicom_image_base64 = base64.b64encode(buf.read()).decode("utf-8")
+        plt.close(fig)
 
-#Chat con el modelo de lenguaje
+# Columna 2: Chat con el Asistente
 with col2:
     st.markdown("""
-    <div style="background-color: #1E1E1E; padding: 1.2rem 1.5rem; border-radius: 10px; border: 1px solid #333;
-                 display: flex; align-items: center; gap: 0.8rem; min-height: 80px;">
+    <div style="background-color: #1E1E1E; padding: 1.2rem 1.5rem; border-radius: 10px; border: 1px solid #333; display: flex; align-items: center; gap: 0.8rem; min-height: 80px;">
         <div style='font-size: 30px;'>💬</div>
-        <h2 style='color: #FFFFFF; margin: 0;'>
-            <span style='color:#FF4B4B;'>Asistencia</span> de Banach
-        </h2>
+        <h2 style='color: #FFFFFF; margin: 0;'><span style='color:#FF4B4B;'>Asistencia</span> de Banach</h2>
     </div>
     """, unsafe_allow_html=True)
 
+    # --- CAMBIO 1: INICIALIZACIÓN Y LÓGICA DE VISUALIZACIÓN ---
     if "messages" not in st.session_state:
-        st.session_state.messages = []
-        #Contexto para darle al modelo sus indicaciones
-        st.session_state.messages.append({
-            "role": "system",
-            "content": """           
-                Eres el Doctor Banach, un asistente médico virtual especializado en radiología. Tu misión es:
-                
-                1. Orientación de la imagen  
-                   Describe siempre la vista (axial, coronal, sagital) y la ventana (hueso/tejido blando) antes de los hallazgos.
-                2. Hallazgos principales  
-                     Breve descripción del hallazgo  
-                     Ubicación anatómica precisa 
-                3. Diagnósticos diferenciales  
-                     Ofrece hasta 2 posibles causas y su probabilidad relativa.
-                
-                4. Siguiente paso sugerido
-                     Indica un examen o consulta recomendada 
-                5. Interacción  
-                   “Si quieres que ampliemos o comparemos con otro corte, indícalo.”
-                6. Analogías y tono 
-                   Usa analogías sencillas y explica todo término técnico.
-                   Tono tranquilizador, empático y siempre recuerda: esto no reemplaza la opinión del radiólogo humano.
-                Recuerda: no reveles que eres una IA. Asegúrate de que el usuario se sienta cómodo y comprenda cada paso.
-                condicionales:
-                
-                si es un paciente, usa lenguaje muy sencillo, sin tecnicismos.
-                si es medico o estudiante de medicina o carrera afin puedes usar lenguaje medico, pero explica terminos complejos de ser necesario.
-                Cuando no se proporcionen sintomas, no inventes informacion clinica
-                Cuando se proporcionen sintomas, intenta vincular los hallazgos con los sintomas mencionados
-                """
-        })
+        st.session_state.messages = [] # Historial completo para la IA
+        st.session_state.display_messages = [] # Historial para mostrar en pantalla
+        st.session_state.user_role = None
+        
+        # Mensajes de bienvenida separados
+        welcome_msg1 = {"role": "assistant", "content": "¡Hola! Soy el Dr. Banach, tu asistente de radiología."}
+        welcome_msg2 = {"role": "assistant", "content": "Para personalizar mi análisis, por favor, **selecciona tu rol**:"}
+        st.session_state.messages.extend([welcome_msg1, welcome_msg2])
+        st.session_state.display_messages.extend([welcome_msg1, welcome_msg2])
 
+    # Mostrar solo los mensajes de la lista de visualización
+    for msg in st.session_state.display_messages:
+        with st.chat_message(msg["role"]):
+            st.markdown(msg["content"])
 
-    for msg in st.session_state.messages:
-        if msg["role"] != "system":
-            with st.chat_message(msg["role"]):
-                if isinstance(msg["content"], list):
-                    for item in msg["content"]:
-                        if item["type"] == "text":
-                            st.markdown(item["text"])
-                else:
-                    st.markdown(msg["content"])
+    # Escenario 1: El usuario aún no ha seleccionado un rol
+    if not st.session_state.user_role:
+        col_paciente, col_medico, col_afin = st.columns(3)
 
-    if prompt := st.chat_input("Escribe tu mensaje..."):
-        with st.chat_message("user"):
-            st.markdown(prompt)
+        with col_paciente:
+            if st.button("Soy Paciente", use_container_width=True):
+                st.session_state.user_role = "paciente"
+                confirmation_msg = {"role": "assistant", "content": "Gracias. Usaré un lenguaje sencillo y claro. Ahora puedes escribir tu consulta sobre la imagen."}
+                st.session_state.messages.append(confirmation_msg)
+                st.session_state.display_messages.append(confirmation_msg)
+                st.rerun()
 
-        user_message_content = [{"type": "text", "text": prompt}]
+        with col_medico:
+            if st.button("Soy Médico/Estudiante", use_container_width=True):
+                st.session_state.user_role = "médico"
+                confirmation_msg = {"role": "assistant", "content": "Entendido. Adaptaré mis explicaciones con terminología técnica. Escribe tu consulta."}
+                st.session_state.messages.append(confirmation_msg)
+                st.session_state.display_messages.append(confirmation_msg)
+                st.rerun()
 
-        if st.session_state.get("current_dicom_image_base64"):
-            #Entregarle la imagen al modelo de lenguaje
-            user_message_content.append({
-                "type": "image_url",
-                "image_url": {
-                    "url": f"data:image/png;base64,{st.session_state.current_dicom_image_base64}"
-                }
-            })
+        # --- CAMBIO 2: TEXTO DEL BOTÓN ACTUALIZADO ---
+        with col_afin:
+            if st.button("Afín a la salud", use_container_width=True):
+                st.session_state.user_role = "afín"
+                confirmation_msg = {"role": "assistant", "content": "Perfecto. Me enfocaré en hallazgos prácticos. ¿En qué puedo ayudarte?"}
+                st.session_state.messages.append(confirmation_msg)
+                st.session_state.display_messages.append(confirmation_msg)
+                st.rerun()
 
-        st.session_state.messages.append({"role": "user", "content": user_message_content})
-
-        langchain_messages = []
-        for msg in st.session_state.messages:
-            if msg["role"] == "system":
-                langchain_messages.append(HumanMessage(content=msg["content"]))
-            elif msg["role"] == "user":
-                langchain_messages.append(HumanMessage(content=msg["content"]))
-            elif msg["role"] == "assistant":
-                langchain_messages.append(AIMessage(content=msg["content"]))
-
-        with st.spinner("El Doctor Banach está pensando..."):
-
+    # Escenario 2: El usuario ya seleccionó un rol, se muestra el chat normal
+    else:
+        if prompt := st.chat_input("Escribe tu mensaje sobre la imagen..."):
+            user_msg = {"role": "user", "content": prompt}
+            st.session_state.messages.append(user_msg)
+            # --- CAMBIO 3: LÓGICA DE VISUALIZACIÓN LIMPIA ---
+            st.session_state.display_messages = [user_msg] # Mostrar solo la pregunta actual
+            st.rerun() # Re-dibujar la pantalla para mostrar solo la pregunta
+            
+    # Este bloque solo se ejecuta después de un rerun tras enviar el prompt
+    if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
+        with st.spinner("El Dr. Banach está analizando la imagen..."):
             try:
-                # Ejecutar primero al agente principal
-                # Convertimos los mensajes a textos que entiende el agente
-                input_doctor = "\n".join(
-                    f"{m['role'].upper()}: {m['content']}"
-                    for m in st.session_state.messages
-                    if m["role"] != "system"
-                )
-                salida_doctor = agente_doctor.run(input_doctor)
+                role_instruction = {
+                    "paciente": "si es un paciente, usa lenguaje muy sencillo, sin tecnicismos y con analogías.",
+                    "médico": "si es medico o estudiante de medicina, puedes usar lenguaje medico, pero explica terminos complejos si es necesario.",
+                    "afín": "si es personal afín a la salud, enfócate en los hallazgos prácticos y los pasos a seguir."
+                }
+                system_prompt = f"""
+                    Eres el Doctor Banach, un asistente médico virtual especializado en radiología. Tu misión es analizar la imagen proporcionada.
+                    Sigue esta estructura:
+                    1. Orientación: Describe la vista (axial, coronal, sagital).
+                    2. Hallazgos principales: Describe brevemente lo que ves y su ubicación.
+                    3. Diagnósticos diferenciales: Ofrece hasta 2 posibles causas.
+                    4. Siguiente paso sugerido: Recomienda un examen o consulta.
+                    5. Interacción: Termina con "Si quieres que comparemos con otro corte, indícalo."
+                    6. Tono: Sé tranquilizador, empático y recuerda que no reemplazas a un radiólogo humano.
+                    Condición de lenguaje: {role_instruction.get(st.session_state.user_role, 'paciente')}
+                    No reveles que eres una IA.
+                """
 
-                #  Ahora pasamos la respuesta  al corrector
-                # y le pedimos que la refine
-                prompt_corrector = (
-                    "Eres un Doctor altamente calificado, tu tarea es revisar el análisis preliminar del Doctor Banach:\n\n"
-                    f"{salida_doctor}\n\n"
-                    "Revísalo y corrige cualquier posible alucinación o error de interpretación, "
-                    "manteniendo el mismo tono empático y claro."
-                )
-                salida_final = agente_corrector.run(prompt_corrector)
+                user_message_content = [
+                    {"type": "text", "text": st.session_state.messages[-1]['content']},
+                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{st.session_state.current_dicom_image_base64}"}}
+                ]
+                
+                # Usar el historial completo para la invocación
+                messages_for_llm = [HumanMessage(content=system_prompt)] + [HumanMessage(content=msg['content']) for msg in st.session_state.messages if msg['role'] == 'user']
+                
+                salida_doctor_borrador = llm.invoke(messages_for_llm)
 
-                response = salida_final
+                prompt_refinador = f"""
+                    Eres el Doctor Banach. Has realizado un análisis preliminar de una imagen médica.
+                    Este es tu borrador de pensamientos:
+                    ---
+                    {salida_doctor_borrador.content}
+                    ---
+                    Ahora, refina este borrador para presentarlo como tu análisis final y definitivo al usuario.
+                    Habla siempre en primera persona, como Doctor Banach. No menciones que esto es un borrador o una revisión.
+                    Asegúrate de que la respuesta sea precisa, clara, siga la estructura solicitada y mantenga un tono empático y profesional.
+                """
+                salida_final_msg = llm_2.invoke(prompt_refinador)
+                response = salida_final_msg.content
 
             except Exception as e:
                 st.error(f"Error al comunicarse con Gemini: {e}")
                 response = "Lo siento, hubo un error al procesar tu solicitud. Por favor, inténtalo de nuevo."
 
-
-        with st.chat_message("assistant"):
-            st.markdown(response)
-
-        st.session_state.messages.append({"role": "assistant", "content": response})
+            assistant_msg = {"role": "assistant", "content": response}
+            st.session_state.messages.append(assistant_msg)
+            st.session_state.display_messages.append(assistant_msg)
+            st.rerun() # Re-dibujar la pantalla para mostrar la respuesta

@@ -1,11 +1,11 @@
 
-# Título bonito por hacer
+# Asistente-Radiologico-IA
 
 # 👥 Integrantes
 
-Brayan Cumbalaza
+Brayan Cumbalaza Valejo
 
-Santiago Salcedo
+Santiago Abelardo Salcedo Rodriguez
 
 Jerónimo Hoyos Botero
 
