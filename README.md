@@ -1,5 +1,5 @@
 
-![LOGO](assets\logo.PNG)
+![LOGO](https://cdn.discordapp.com/attachments/949495010829688942/1390158587913044119/logo.PNG?ex=68673d93&is=6865ec13&hm=0f922e7b16245234f1035f60701b631677daaa2fcdfe21adc1f5fe81b6a96cc1&)
 
 # 👥 Integrantes
 
