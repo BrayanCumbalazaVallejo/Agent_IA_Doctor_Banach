@@ -9,11 +9,7 @@ Santiago Abelardo Salcedo Rodriguez
 
 Jerónimo Hoyos Botero
 
-# 📝 Descripción del proyecto
-
-# Banach: Explicación Técnica
-
-## El Problema Técnico
+# 📝 Descripción del proyecto  Y El Problema Técnico
 
 La interpretación de estudios de imagenología médica, como las tomografías computarizadas (TC), presenta dos desafíos técnicos fundamentales:
 
