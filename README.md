@@ -66,7 +66,7 @@ El objetivo es facilitar tanto el análisis técnico como el entendimiento por p
 git clone https://github.com/tu-usuario/Hackaton_DeepPunk_Doc_Banach
 
 # Entrar al directorio del Desarrollo
-cd /desarrollo
+cd Agent_IA_Doctor_Banach/desarrollo
 
 # Crear entorno virtual (Python)
 python -m venv .venv

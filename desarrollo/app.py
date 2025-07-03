@@ -13,14 +13,13 @@ import streamlit as st
 
 # Manejo modelos de lenguaje
 from langchain_google_genai import ChatGoogleGenerativeAI
-# CAMBIO: Añadir AIMessage para modelar correctamente la conversación
 from langchain_core.messages import HumanMessage, AIMessage
 
-# --- FUNCIONES ---
+# Funciones
 def cargar_pixeldata_dicom(carpeta_dicoms: str):
     try:
         ordered_names = sorted(os.listdir(carpeta_dicoms))
-        pixel_data = [pydicom.dcmread(os.path.join(carpeta_dicoms, name)).pixel_array for name in ordered_names]
+        pixel_data = [pydicom.dcmread(os.path.join(carpeta_dicoms, name),force=True).pixel_array for name in ordered_names]
         return np.array(pixel_data, dtype="int16")
     except FileNotFoundError:
         st.error(f"Error: No se encontró el directorio de DICOMs en la ruta: '{carpeta_dicoms}'.")
@@ -29,10 +28,10 @@ def cargar_pixeldata_dicom(carpeta_dicoms: str):
         st.error(f"Ocurrió un error al cargar los archivos DICOM: {e}")
         return None
 
-# --- CONFIGURACIÓN INICIAL ---
+# Entornos de variable
 load_dotenv()
 GOOGLE_API_KEY = os.getenv('GOOGLE_API_KEY')
-DICOM_FOLDER_PATH = os.getenv('DICOM_FOLDER_PATH', './data/dataset_2_sub-01_run-01_T1w')
+DICOM_FOLDER_PATH = os.getenv('DICOM_FOLDER_PATH')
 
 # Modelos de Lenguaje
 llm = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0, google_api_key=GOOGLE_API_KEY)
@@ -40,35 +39,45 @@ llm_2 = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.1, google
 
 st.set_page_config(layout="wide")
 
-# --- HEADER DE LA APLICACIÓN (Sin cambios) ---
-col1_header, col2_header = st.columns(2)
+# Header interfaz
+col1_header, col2_header = st.columns([1, 3])
 with col1_header:
-    st.markdown("""
-    <div style="background-color: #1E1E1E; padding: 1.5rem; border-radius: 10px; border: 1px solid #333; height: 100%;">
-        <div style='text-align: left; display: flex; flex-direction: column; justify-content: space-between; height: 100%;'>
-            <div style='font-size: 50px;'>🩻 👨‍⚕️ 🧬 🩺</div>
-            <h1 style='color: #FF4B4B; margin-bottom: 0.2em;'><strong>Doctor</strong> <span style='color:#FFFFFF;'>Banach</span></h1>
-            <h4 style='color: #CCCCCC; margin-top: 0;'>Tu asistente de estudios de imágenes médicas</h4>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+    # Logo
+    st.image("assets\logo.PNG",  use_container_width=True)
 
 with col2_header:
+    # Descripción
     st.markdown("""
     <div style="background-color: #1E1E1E; padding: 1.5rem; border-radius: 10px; border: 1px solid #333; height: 100%;">
-        <h3 style="color: #FF4B4B; margin-bottom: 0.5rem;">📝 Descripción del proyecto</h3>
-        <p style="color: #CCCCCC; font-size: 16px;">Esta herramienta interactiva permite visualizar <strong>cortes anatómicos</strong> y proporciona asistencia para la interpretación inicial de las imágenes.</p>
-        <ul style="color: #AAAAAA; font-size: 15px; line-height: 1.6;">
-            <li>🔄 Visualización en tiempo real</li>
-            <li>🔃 Rotación e inspección por cortes</li>
-            <li>🧭 Soporte de diferentes vistas anatómicas</li>
+        <h3 style="color: #FFFFFF; margin-bottom: 0.8rem;">
+            📝 <span style="color: #FF4B4B;">Descripción del</span> Proyecto
+        </h3>
+        <p style="color: #CCCCCC; font-size: 16px;">
+            Esta herramienta combina la visualización médica con inteligencia artificial para brindar apoyo tanto a profesionales de la salud como a estudiantes y pacientes. 
+            Permite explorar detalladamente <strong>cortes anatómicos</strong> de estudios médicos como tomografías o resonancias, mientras una IA especializada asiste en la comprensión y análisis de las imágenes.
+        </p>
+        <ul style="color: #AAAAAA; font-size: 15px; line-height: 1.7; padding-left: 20px;">
+            <li style="margin-bottom: 10px;">
+                🔬 <strong>Visualizador Interactivo:</strong> Explora cortes axiales, coronales y sagitales en tiempo real con controles intuitivos de deslizamiento, acercamiento y rotación en dispositivos móviles y de escritorio.
+            </li>
+            <li style="margin-bottom: 10px;">
+                🤖 <strong>Análisis con IA:</strong> Recibe un primer análisis automatizado de la imagen médica, incluyendo hallazgos relevantes, sugerencias diagnósticas preliminares y preguntas de seguimiento.
+            </li>
+            <li style="margin-bottom: 10px;">
+                🧠 <strong>Agentes Coordinados:</strong> Dos agentes de IA colaboran para brindar respuestas más precisas: uno especializado en lenguaje médico y otro en razonamiento visual.
+            </li>
+            <li style="margin-bottom: 10px;">
+                🤝 <strong>Comunicación Adaptativa:</strong> El lenguaje se ajusta automáticamente si eres paciente, estudiante o personal clínico, facilitando una interacción clara y efectiva según tu nivel de conocimiento.
+            </li>
+            <li style="margin-bottom: 10px;">
+                🌐 <strong>Aplicación Accesible:</strong> Funciona directamente desde el navegador, sin necesidad de instalación, lo que la hace ideal para consultas rápidas, educación médica y apoyo remoto.
+            </li>
         </ul>
     </div>
     """, unsafe_allow_html=True)
-
 st.divider()
 
-# --- CUERPO DE LA INTERFAZ (Sin cambios en col1)---
+# Cuerpo interfaz
 col1, col2 = st.columns(2)
 
 with col1:
@@ -105,7 +114,7 @@ with col1:
         st.session_state.current_dicom_image_base64 = base64.b64encode(buf.read()).decode("utf-8")
         plt.close(fig)
 
-# --- Columna 2: Chat con el Asistente (Con correcciones) ---
+# Chat con el agente de IA
 with col2:
     st.markdown("""
     <div style="background-color: #1E1E1E; padding: 1.2rem 1.5rem; border-radius: 10px; border: 1px solid #333; display: flex; align-items: center; gap: 0.8rem; min-height: 80px;">
@@ -132,6 +141,7 @@ with col2:
         col_paciente, col_medico, col_afin = st.columns(3)
 
         with col_paciente:
+            # Elegir perfil del usuario
             if st.button("Soy Paciente", use_container_width=True):
                 st.session_state.user_role = "paciente"
                 
@@ -166,6 +176,7 @@ with col2:
             st.rerun()
             
     if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
+            #Agente 1 Doctor Banach
         with st.spinner("El Dr. Banach está analizando la imagen..."):
             try:
                 role_instruction = {
@@ -186,9 +197,7 @@ with col2:
                     No reveles que eres una IA.
                 """
 
-                # --- INICIO DE LA CORRECCIÓN ---
-                
-                # 1. Preparar el historial de la conversación (todos los mensajes menos el último)
+                #  historial de la conversación 
                 history_messages = []
                 for msg in st.session_state.messages[:-1]:
                     if msg['role'] == 'user':
@@ -196,7 +205,7 @@ with col2:
                     elif msg['role'] == 'assistant':
                         history_messages.append(AIMessage(content=msg['content']))
 
-                # 2. Crear el mensaje final del usuario con texto E IMAGEN
+                # 2. mensaje final del usuario
                 last_user_prompt_text = st.session_state.messages[-1]['content']
                 final_user_message_content = [
                     {"type": "text", "text": last_user_prompt_text},
@@ -206,17 +215,16 @@ with col2:
                     }
                 ]
 
-                # 3. Combinar todo en el formato correcto para el modelo
+                # formato correcto para el modelo
                 messages_for_llm = [
                     HumanMessage(content=system_prompt),
                     *history_messages,
                     HumanMessage(content=final_user_message_content)
                 ]
-                
-                # --- FIN DE LA CORRECCIÓN ---
 
                 salida_doctor_borrador = llm.invoke(messages_for_llm)
 
+                #Agente 2 refinación
                 prompt_refinador = f"""
                     Eres el Doctor Banach. Has realizado un análisis preliminar de una imagen médica.
                     Este es tu borrador de pensamientos:
