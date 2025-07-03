@@ -13,7 +13,8 @@ import streamlit as st
 
 # Manejo modelos de lenguaje
 from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_core.messages import HumanMessage
+# CAMBIO: Añadir AIMessage para modelar correctamente la conversación
+from langchain_core.messages import HumanMessage, AIMessage
 
 # --- FUNCIONES ---
 def cargar_pixeldata_dicom(carpeta_dicoms: str):
@@ -39,7 +40,7 @@ llm_2 = ChatGoogleGenerativeAI(model="gemini-1.5-flash", temperature=0.1, google
 
 st.set_page_config(layout="wide")
 
-# --- HEADER DE LA APLICACIÓN ---
+# --- HEADER DE LA APLICACIÓN (Sin cambios) ---
 col1_header, col2_header = st.columns(2)
 with col1_header:
     st.markdown("""
@@ -67,10 +68,9 @@ with col2_header:
 
 st.divider()
 
-# --- CUERPO DE LA INTERFAZ ---
+# --- CUERPO DE LA INTERFAZ (Sin cambios en col1)---
 col1, col2 = st.columns(2)
 
-# Columna 1: Visualizador de Imágenes
 with col1:
     st.markdown("""
     <div style="background-color: #1E1E1E; padding: 1.2rem 1.5rem; border-radius: 10px; border: 1px solid #333; display: flex; align-items: center; gap: 0.8rem; min-height: 80px;">
@@ -105,7 +105,7 @@ with col1:
         st.session_state.current_dicom_image_base64 = base64.b64encode(buf.read()).decode("utf-8")
         plt.close(fig)
 
-# Columna 2: Chat con el Asistente
+# --- Columna 2: Chat con el Asistente (Con correcciones) ---
 with col2:
     st.markdown("""
     <div style="background-color: #1E1E1E; padding: 1.2rem 1.5rem; border-radius: 10px; border: 1px solid #333; display: flex; align-items: center; gap: 0.8rem; min-height: 80px;">
@@ -114,33 +114,32 @@ with col2:
     </div>
     """, unsafe_allow_html=True)
 
-    # --- CAMBIO 1: INICIALIZACIÓN Y LÓGICA DE VISUALIZACIÓN ---
     if "messages" not in st.session_state:
-        st.session_state.messages = [] # Historial completo para la IA
-        st.session_state.display_messages = [] # Historial para mostrar en pantalla
+        st.session_state.messages = [] 
+        st.session_state.display_messages = []
         st.session_state.user_role = None
         
-        # Mensajes de bienvenida separados
         welcome_msg1 = {"role": "assistant", "content": "¡Hola! Soy el Dr. Banach, tu asistente de radiología."}
         welcome_msg2 = {"role": "assistant", "content": "Para personalizar mi análisis, por favor, **selecciona tu rol**:"}
         st.session_state.messages.extend([welcome_msg1, welcome_msg2])
         st.session_state.display_messages.extend([welcome_msg1, welcome_msg2])
 
-    # Mostrar solo los mensajes de la lista de visualización
     for msg in st.session_state.display_messages:
         with st.chat_message(msg["role"]):
             st.markdown(msg["content"])
 
-    # Escenario 1: El usuario aún no ha seleccionado un rol
     if not st.session_state.user_role:
         col_paciente, col_medico, col_afin = st.columns(3)
 
         with col_paciente:
             if st.button("Soy Paciente", use_container_width=True):
                 st.session_state.user_role = "paciente"
-                confirmation_msg = {"role": "assistant", "content": "Gracias. Usaré un lenguaje sencillo y claro. Ahora puedes escribir tu consulta sobre la imagen."}
-                st.session_state.messages.append(confirmation_msg)
-                st.session_state.display_messages.append(confirmation_msg)
+                
+                disclaimer_msg = {"role": "assistant", "content": "Gracias. Usaré un lenguaje sencillo y claro. **Es muy importante recordar que soy un asistente virtual. Mis análisis son una orientación y no reemplazan el diagnóstico de un médico certificado. Cualquier decisión sobre tu salud debe ser consultada y supervisada por un profesional.**"}
+                follow_up_msg = {"role": "assistant", "content": "Dicho esto, ¿te ayudo a interpretar los datos de la imagen?"}
+                
+                st.session_state.messages.extend([disclaimer_msg, follow_up_msg])
+                st.session_state.display_messages.extend([disclaimer_msg, follow_up_msg])
                 st.rerun()
 
         with col_medico:
@@ -151,7 +150,6 @@ with col2:
                 st.session_state.display_messages.append(confirmation_msg)
                 st.rerun()
 
-        # --- CAMBIO 2: TEXTO DEL BOTÓN ACTUALIZADO ---
         with col_afin:
             if st.button("Afín a la salud", use_container_width=True):
                 st.session_state.user_role = "afín"
@@ -160,16 +158,13 @@ with col2:
                 st.session_state.display_messages.append(confirmation_msg)
                 st.rerun()
 
-    # Escenario 2: El usuario ya seleccionó un rol, se muestra el chat normal
     else:
         if prompt := st.chat_input("Escribe tu mensaje sobre la imagen..."):
             user_msg = {"role": "user", "content": prompt}
             st.session_state.messages.append(user_msg)
-            # --- CAMBIO 3: LÓGICA DE VISUALIZACIÓN LIMPIA ---
-            st.session_state.display_messages = [user_msg] # Mostrar solo la pregunta actual
-            st.rerun() # Re-dibujar la pantalla para mostrar solo la pregunta
+            st.session_state.display_messages = [user_msg]
+            st.rerun()
             
-    # Este bloque solo se ejecuta después de un rerun tras enviar el prompt
     if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
         with st.spinner("El Dr. Banach está analizando la imagen..."):
             try:
@@ -191,14 +186,35 @@ with col2:
                     No reveles que eres una IA.
                 """
 
-                user_message_content = [
-                    {"type": "text", "text": st.session_state.messages[-1]['content']},
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{st.session_state.current_dicom_image_base64}"}}
+                # --- INICIO DE LA CORRECCIÓN ---
+                
+                # 1. Preparar el historial de la conversación (todos los mensajes menos el último)
+                history_messages = []
+                for msg in st.session_state.messages[:-1]:
+                    if msg['role'] == 'user':
+                        history_messages.append(HumanMessage(content=msg['content']))
+                    elif msg['role'] == 'assistant':
+                        history_messages.append(AIMessage(content=msg['content']))
+
+                # 2. Crear el mensaje final del usuario con texto E IMAGEN
+                last_user_prompt_text = st.session_state.messages[-1]['content']
+                final_user_message_content = [
+                    {"type": "text", "text": last_user_prompt_text},
+                    {
+                        "type": "image_url",
+                        "image_url": {"url": f"data:image/png;base64,{st.session_state.current_dicom_image_base64}"}
+                    }
+                ]
+
+                # 3. Combinar todo en el formato correcto para el modelo
+                messages_for_llm = [
+                    HumanMessage(content=system_prompt),
+                    *history_messages,
+                    HumanMessage(content=final_user_message_content)
                 ]
                 
-                # Usar el historial completo para la invocación
-                messages_for_llm = [HumanMessage(content=system_prompt)] + [HumanMessage(content=msg['content']) for msg in st.session_state.messages if msg['role'] == 'user']
-                
+                # --- FIN DE LA CORRECCIÓN ---
+
                 salida_doctor_borrador = llm.invoke(messages_for_llm)
 
                 prompt_refinador = f"""
@@ -221,4 +237,4 @@ with col2:
             assistant_msg = {"role": "assistant", "content": response}
             st.session_state.messages.append(assistant_msg)
             st.session_state.display_messages.append(assistant_msg)
-            st.rerun() # Re-dibujar la pantalla para mostrar la respuesta
+            st.rerun()
