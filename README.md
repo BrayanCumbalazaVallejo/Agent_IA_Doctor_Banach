@@ -1,5 +1,5 @@
 
-# Asistente-Radiologico-IA (hecho Por Jero)
+![LOGO](assets\logo.PNG)
 
 # 👥 Integrantes
 
