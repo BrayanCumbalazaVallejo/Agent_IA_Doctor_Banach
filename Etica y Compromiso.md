@@ -63,7 +63,7 @@ El proyecto Banach es un ejercicio de innovación responsable. Entendemos que la
 
 ---
 
-## Referencias (Estilo Vancouver)
+## Referencias
 
 [1] World Health Organization. Ethics and governance of artificial intelligence for health: WHO guidance. Geneva: World Health Organization; 2021.
 
