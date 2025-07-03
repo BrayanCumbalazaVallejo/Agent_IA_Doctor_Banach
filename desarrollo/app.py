@@ -161,7 +161,7 @@ with col2:
                 st.rerun()
 
         with col_afin:
-            if st.button("Afín a la salud", use_container_width=True):
+            if st.button("Soy Personal de salud", use_container_width=True):
                 st.session_state.user_role = "afín"
                 confirmation_msg = {"role": "assistant", "content": "Perfecto. Me enfocaré en hallazgos prácticos. ¿En qué puedo ayudarte?"}
                 st.session_state.messages.append(confirmation_msg)
