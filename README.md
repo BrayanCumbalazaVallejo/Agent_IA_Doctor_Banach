@@ -3,9 +3,9 @@
 
 # 👥 Integrantes
 
-Brayan Cumbalaza
+Brayan Armando Cumbalaza Vallejo
 
-Santiago Salcedo
+Santiago Abelardo Salcedo Rodriguez
 
 Jerónimo Hoyos Botero
 
