@@ -10,15 +10,40 @@ Santiago Abelardo Salcedo Rodriguez
 Jerónimo Hoyos Botero
 
 # 📝 Descripción del proyecto
-Esta herramienta interactiva permite visualizar cortes anatómicos (axial, coronal y sagital) a partir de estudios médicos (como TAC o resonancias), y proporciona asistencia para la interpretación inicial de las imágenes.
 
-El objetivo es facilitar tanto el análisis técnico como el entendimiento por parte del paciente o especialista.
+# Banach: Explicación Técnica
 
-🔄 Visualización en tiempo real
+## El Problema Técnico
 
-🔃 Rotación e inspección por cortes
+La interpretación de estudios de imagenología médica, como las tomografías computarizadas (TC), presenta dos desafíos técnicos fundamentales:
 
-🧭 Soporte de diferentes vistas anatómicas 
+1.  **Manejo de Datos Volumétricos:** Los estudios médicos no son imágenes planas, sino series de archivos (generalmente en formato DICOM) que representan un volumen tridimensional. Su procesamiento requiere la lectura, ordenamiento y apilamiento de cientos de cortes para reconstruir el volumen anatómico, una tarea que debe ser eficiente y precisa.
+2.  **Brecha de Comunicación y Contexto:** La información contenida en estas imágenes es densa y requiere conocimiento especializado. Un sistema de IA debe ser capaz no solo de "ver" la imagen, sino de interpretar la consulta del usuario en lenguaje natural y, lo más importante, **adaptar su respuesta al nivel de conocimiento del interlocutor** (paciente, estudiante de medicina o médico especialista). Una respuesta única para todos es ineficaz.
+
+## Nuestra Solución: Arquitectura de Agentes Inteligentes Coordinados
+
+Para resolver este problema, desarrollamos **Banach**, una aplicación web interactiva que implementa una arquitectura de agentes de IA coordinados para ofrecer un análisis preciso y adaptativo. El flujo técnico es el siguiente:
+
+### 1. Procesamiento y Visualización del Volumen
+
+* **Ingesta de Datos:** Utilizamos la biblioteca **Pydicom** en **Python** para el procesamiento de volúmenes de datos.
+* **Visualizador Interactivo:** La interfaz, construida con **Streamlit**, permite al usuario navegar por este volumen. Se generan dinámicamente los tres planos anatómicos canónicos (Axial, Coronal y Sagital) mediante la transposición de los ejes del array de NumPy.
+
+### 2. Sistema de Doble Agente con Gemini y LangChain
+
+El núcleo de Banach es un sistema de dos agentes de IA que trabajan en secuencia: un **Agente Principal** y un **Agente Afinador**.
+
+* **Agente N.º 1: "El Doctor" - Analista Especializado**
+    * **Misión:** Realizar un primer análisis estructurado y técnico de la imagen.
+    * **Funcionamiento:** Cuando el usuario envía una consulta, la imagen y el historial de la conversación se envían al modelo **Gemini** a través de **LangChain**.
+    * **Inteligencia Adaptativa:** El prompt de sistema instruye al agente para que actúe como "Doctor Banach" y adapte su lenguaje según el perfil del usuario.
+
+* **Agente N.º 2: "El Refinador" - Comunicador Empático**
+    * **Misión:** Convertir el borrador técnico del primer agente en una respuesta final, pulida y clara.
+    * **Funcionamiento:** La respuesta en borrador del Agente 1 **no se muestra al usuario**. En su lugar, se introduce en un segundo prompt que instruye a otro LLM para que "revise y refine" el análisis.
+    * **Resultado:** Este segundo agente se encarga de suavizar el lenguaje y mejorar la empatía, asegurando la coherencia y presentando la información en primera persona como Doctor Banach.
+
+Este enfoque de doble agente resuelve el problema de la comunicación contextual, permitiendo que Banach ofrezca análisis técnicamente sólidos con un nivel de claridad y empatía que un sistema de un solo paso difícilmente podría lograr.
 
 ---
 
