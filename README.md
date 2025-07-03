@@ -103,7 +103,7 @@ echo "GOOGLE_API_KEY=tu_clave_gemini" >> .env
 echo "DICOM_FOLDER_PATH=direccion_de_la_carpeta_de_dicoms" >> .env
 
 #Activar streamlit
-streamlit run app.py
+streamlit run desarrollo\app.py
 
 #Para desactivar entorno
 deactivate

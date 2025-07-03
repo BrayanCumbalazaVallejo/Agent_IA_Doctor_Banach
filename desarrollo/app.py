@@ -1,3 +1,5 @@
+
+#Revisado por Jerónimo 22:00/07
 # Herramientas
 import numpy as np
 import time
@@ -17,6 +19,9 @@ from langchain_core.messages import HumanMessage, AIMessage
 
 # Funciones
 def cargar_pixeldata_dicom(carpeta_dicoms: str):
+    """
+    Genera un np array valores de gris de 3 dimensiones de la forma (axial,sagital,coronal) a partir de un directorio de dicoms
+    """
     try:
         ordered_names = sorted(os.listdir(carpeta_dicoms))
         pixel_data = [pydicom.dcmread(os.path.join(carpeta_dicoms, name),force=True).pixel_array for name in ordered_names]
@@ -91,23 +96,27 @@ with col1:
     @st.cache_data
     def cargar_datos():
         return cargar_pixeldata_dicom(DICOM_FOLDER_PATH)
-    
     volumen = cargar_datos()
-
+    
+    # Normalmente es formato (X,Y,Z)
     if volumen is not None:
+        #Selección de cortes anátomicos
         cortes_anatomicos = {"Axial": volumen, "Coronal": volumen.transpose(1, 0, 2), "Sagital": volumen.transpose(2, 0, 1)}
         corte = st.radio("Tipo Corte anatómico", ["Axial", "Coronal", "Sagital"], horizontal=True, key="corte_radio")
         vol = cortes_anatomicos[corte]
         index = st.slider(f"Corte {corte.lower()}", 0, vol.shape[0] - 1, vol.shape[0] // 2, key="corte_slider")
+
+        #Rotación del set para ajustar visualización
         grados_rotacion = st.slider("Rotar imagen (grados)", 0, 270, 0, 90, key="rotacion_slider")
         k = grados_rotacion // 90
-        
+
+        #Desplegar imagen vía matplotlib
         fig, ax = plt.subplots(figsize=(6, 6))
         slice_mostrar = np.rot90(vol[index], k=k)
         ax.imshow(slice_mostrar, cmap="gray")
         ax.axis("off")
         st.pyplot(fig)
-        
+        #Entrega de imagen al modelo de lenguaje
         buf = io.BytesIO()
         fig.savefig(buf, format="png", bbox_inches='tight', pad_inches=0)
         buf.seek(0)
@@ -127,7 +136,8 @@ with col2:
         st.session_state.messages = [] 
         st.session_state.display_messages = []
         st.session_state.user_role = None
-        
+
+        #Mensaje de Welcome para que el usuario que tenga algo que le llame la atención
         welcome_msg1 = {"role": "assistant", "content": "¡Hola! Soy el Dr. Banach, tu asistente de radiología."}
         welcome_msg2 = {"role": "assistant", "content": "Para personalizar mi análisis, por favor, **selecciona tu rol**:"}
         st.session_state.messages.extend([welcome_msg1, welcome_msg2])
@@ -141,7 +151,7 @@ with col2:
         col_paciente, col_medico, col_afin = st.columns(3)
 
         with col_paciente:
-            # Elegir perfil del usuario
+            # Elegir perfil del usuario para realizar unas respuestas más personalizadas
             if st.button("Soy Paciente", use_container_width=True):
                 st.session_state.user_role = "paciente"
                 
@@ -176,7 +186,7 @@ with col2:
             st.rerun()
             
     if st.session_state.messages and st.session_state.messages[-1]["role"] == "user":
-            #Agente 1 Doctor Banach
+            # Agente 1 Doctor Banach
         with st.spinner("El Dr. Banach está analizando la imagen..."):
             try:
                 role_instruction = {
@@ -197,7 +207,7 @@ with col2:
                     No reveles que eres una IA.
                 """
 
-                #  historial de la conversación 
+                #  Historial de la conversación 
                 history_messages = []
                 for msg in st.session_state.messages[:-1]:
                     if msg['role'] == 'user':
@@ -205,7 +215,7 @@ with col2:
                     elif msg['role'] == 'assistant':
                         history_messages.append(AIMessage(content=msg['content']))
 
-                # 2. mensaje final del usuario
+                # 2. Mensaje final del usuario
                 last_user_prompt_text = st.session_state.messages[-1]['content']
                 final_user_message_content = [
                     {"type": "text", "text": last_user_prompt_text},
@@ -215,7 +225,7 @@ with col2:
                     }
                 ]
 
-                # formato correcto para el modelo
+                # Formato correcto para el modelo
                 messages_for_llm = [
                     HumanMessage(content=system_prompt),
                     *history_messages,
@@ -224,7 +234,7 @@ with col2:
 
                 salida_doctor_borrador = llm.invoke(messages_for_llm)
 
-                #Agente 2 refinación
+                # Agente 2 refinación
                 prompt_refinador = f"""
                     Eres el Doctor Banach. Has realizado un análisis preliminar de una imagen médica.
                     Este es tu borrador de pensamientos:
